@@ -2,7 +2,7 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 import datetime
 
-TOKEN = "YOUR_BOT_TOKEN_HERE"
+TOKEN = "8146345458:AAFNkn0CwekS4aluEkYIzO8M5pni6tIAPJE"
 
 # የሳምንት ምግብ program
 menu = {
