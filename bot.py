@@ -1,98 +1,88 @@
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 
-TOKEN = "YOUR_BOT_TOKEN_HERE"
+TOKEN = "8146345458:AAFNkn0CwekS4aluEkYIzO8M5pni6tIAPJE"
 
-# ===== MAIN MENU =====
-main_menu = ReplyKeyboardMarkup(
-    [
-        ["📋 የምግብ ፕሮግራም"],
-        ["📍 የካፌ Location"],
-        ["ℹ️ Help"]
-    ],
-    resize_keyboard=True
-)
+# Main Menu
+main_menu = [["🍽 የምግብ ፕሮግራም", "📍 የካፌ Location"],
+             ["❓ Help"]]
 
-# ===== DAYS MENU =====
-days_menu = ReplyKeyboardMarkup(
-    [
-        ["ሰኞ", "ማክሰኞ", "እሮብ"],
-        ["ሐሙስ", "ዓርብ", "ቅዳሜ"],
-        ["እሁድ"]
-    ],
-    resize_keyboard=True
-)
+# Days Menu
+days_menu = [["ሰኞ", "ማክሰኞ", "እሮብ"],
+             ["ሐሙስ", "ዓርብ", "ቅዳሜ"],
+             ["እሁድ", "🔙 Back"]]
 
-# ===== LOCATION MENU =====
-location_menu = ReplyKeyboardMarkup(
-    [
-        ["አሪድ", "ቢዝነስ"],
-        ["ዓይደር", "ዲያስፖራ"]
-    ],
-    resize_keyboard=True
-)
+# Location Menu
+location_menu = [["አሪድ", "ቢዝነስ"],
+                 ["ዓይደር", "ዲያስፖራ"],
+                 ["🔙 Back"]]
 
-# ===== FOOD DATA =====
-food_menu = {
-    "ሰኞ": "🍳 ቁርስ: ፍርፍር\n🍛 ምሳ: ሽሮ\n🍲 እራት: ዶሮ",
-    "ማክሰኞ": "🍳 ቁርስ: እንቁላል\n🍛 ምሳ: ፓስታ\n🍲 እራት: ክክ",
-    "እሮብ": "🍳 ቁርስ: ፍርፍር\n🍛 ምሳ: ሩዝ\n🍲 እራት: ስጋ",
-    "ሐሙስ": "🍳 ቁርስ: እንቁላል\n🍛 ምሳ: ሽሮ\n🍲 እራት: ድንች",
-    "ዓርብ": "🍳 ቁርስ: ፍርፍር\n🍛 ምሳ: ክክ\n🍲 እራት: ዓሣ",
-    "ቅዳሜ": "🍳 ቁርስ: እንቁላል\n🍛 ምሳ: ሩዝ\n🍲 እራት: ዶሮ",
-    "እሁድ": "🍳 ቁርስ: ፍርፍር\n🍛 ምሳ: ስጋ\n🍲 እራት: ክክ"
-}
-
-# ===== START =====
+# Start command
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "👋 እንኳን ደህና መጡ!\n\nእባክዎ ከሚከተሉት ይምረጡ:",
-        reply_markup=main_menu
+        "👋 እንኳን ወደ Cafe Bot በደህና መጡ!",
+        reply_markup=ReplyKeyboardMarkup(main_menu, resize_keyboard=True)
     )
 
-# ===== HANDLE MESSAGES =====
+# Handle messages
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
 
-    # ምግብ ፕሮግራም
-    if text == "📋 የምግብ ፕሮግራም":
-        await update.message.reply_text("📅 ቀን ይምረጡ:", reply_markup=days_menu)
-
-    # ቀኖች
-    elif text in food_menu:
-        await update.message.reply_text(f"📅 {text}\n{food_menu[text]}")
-
-    # location
-    elif text == "📍 የካፌ Location":
-        await update.message.reply_text("📍 ቦታ ይምረጡ:", reply_markup=location_menu)
-
-    elif text == "አሪድ":
-        await update.message.reply_text("📍 አሪድ: ከመግቢያ በር 500 ሜትር ወደ ሰሜን")
-
-    elif text == "ቢዝነስ":
-        await update.message.reply_text("📍 ቢዝነስ: ከላይብረሪ አጠገብ")
-
-    elif text == "ዓይደር":
-        await update.message.reply_text("📍 ዓይደር: ከሆስፒታል በኩል")
-
-    elif text == "ዲያስፖራ":
-        await update.message.reply_text("📍 ዲያስፖራ: ከማዕከል ቅርብ")
-
-    # help
-    elif text == "ℹ️ Help":
+    # Food program
+    if text == "🍽 የምግብ ፕሮግራም":
         await update.message.reply_text(
-            "ℹ️ ይህ bot የuniversity ምግብ ፕሮግራም ያሳያል።\n\n"
-            "👉 ምግብ ለማየት → የምግብ ፕሮግራም\n"
-            "👉 ቦታ ለማወቅ → Location"
+            "ቀን ይምረጡ:",
+            reply_markup=ReplyKeyboardMarkup(days_menu, resize_keyboard=True)
         )
 
-    else:
-        await update.message.reply_text("❗ እባክዎ ከmenu ይምረጡ")
+    elif text in ["ሰኞ","ማክሰኞ","እሮብ","ሐሙስ","ዓርብ","ቅዳሜ","እሁድ"]:
+        await update.message.reply_text(
+            f"📅 {text} ፕሮግራም\n\n"
+            f"🍳 ቁርስ: እንጀራ + ሽሮ\n"
+            f"🍛 ምሳ: ሩዝ + ዶሮ\n"
+            f"🍲 እራት: ፓስታ",
+            reply_markup=ReplyKeyboardMarkup(days_menu, resize_keyboard=True)
+        )
 
-# ===== MAIN =====
+    # Location
+    elif text == "📍 የካፌ Location":
+        await update.message.reply_text(
+            "ካፌ ይምረጡ:",
+            reply_markup=ReplyKeyboardMarkup(location_menu, resize_keyboard=True)
+        )
+
+    elif text == "አሪድ":
+        await update.message.reply_text("📍 ከመግቢያ 500m ወደ ሰሜን")
+
+    elif text == "ቢዝነስ":
+        await update.message.reply_text("📍 ከLibrary አጠገብ")
+
+    elif text == "ዓይደር":
+        await update.message.reply_text("📍 ከHospital በቀርብ")
+
+    elif text == "ዲያስፖራ":
+        await update.message.reply_text("📍 ከMain gate በቀርብ")
+
+    # Help
+    elif text == "❓ Help":
+        await update.message.reply_text(
+            "ℹ️ እባክህ ከmenu ላይ ምርጫ ያድርጉ:\n"
+            "🍽 የምግብ ፕሮግራም\n"
+            "📍 Location\n"
+            "❓ Help"
+        )
+
+    # Back
+    elif text == "🔙 Back":
+        await update.message.reply_text(
+            "🏠 Main Menu",
+            reply_markup=ReplyKeyboardMarkup(main_menu, resize_keyboard=True)
+        )
+
+# Run bot
 app = ApplicationBuilder().token(TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+app.add_handler(MessageHandler(filters.TEXT, handle_message))
 
 app.run_polling()
