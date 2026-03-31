@@ -1,10 +1,12 @@
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 
-TOKEN = "8146345458:AAFNkn0CwekS4aluEkYIzO8M5pni6tIAPJE"
+TOKEN = "PUT_YOUR_TOKEN_HERE"
 
-main_menu = [["🍽 የምግብ ፕሮግራም", "📍 የካፌ location"], ["❓ Help"]]
+# MAIN MENU
+main_menu = [["🍽 ምግብ", "📍 Location"], ["❓ Help"]]
 
+# DAYS
 days_menu = [
     ["ሰኞ", "ማክሰኞ", "እሮብ"],
     ["ሐሙስ", "ዓርብ"],
@@ -12,13 +14,15 @@ days_menu = [
     ["🔙 Back"]
 ]
 
+# LOCATIONS
 location_menu = [
     ["አሪድ", "ቢዝነስ"],
     ["ዓይደር", "ዲያስፖራ"],
     ["🔙 Back"]
 ]
 
-food_program = {
+# FOOD DATA
+food = {
     "ሰኞ": "ቁርስ: 2 ዳቦ+ሩዝ+ሻይ\nምሳ: ፓስታ+2 ዳቦ\nእራት: እንጀራ+ስልስ+ሽሮ",
     "ማክሰኞ": "ቁርስ: 2 ዳቦ+ፍርፍር+ሻይ\nምሳ: እንጀራ+ድንች\nእራት: እንጀራ+ድንች",
     "እሮብ": "ቁርስ: 2 ዳቦ+ማኮሮኒ+ሻይ\nምሳ: እንጀራ+ድንች\nእራት: እንጀራ+ክክ",
@@ -28,6 +32,7 @@ food_program = {
     "እሁድ": "ቁርስ: 2 ዳቦ+ፍርፍር+ሻይ\nምሳ: እንጀራ+ሽሮ+ስልስ\nእራት: እንጀራ+ክክ",
 }
 
+# LOCATIONS DATA
 locations = {
     "አሪድ": "500m ወደ ሰሜን",
     "ቢዝነስ": "300m ወደ ምስራቅ",
@@ -35,20 +40,22 @@ locations = {
     "ዲያስፖራ": "400m ወደ ደቡብ",
 }
 
+# START
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Menu ይምረጡ", reply_markup=ReplyKeyboardMarkup(main_menu, resize_keyboard=True))
 
+# HANDLE
 async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
 
-    if text == "🍽 የምግብ ፕሮግራም":
+    if text == "🍽 ምግብ":
         await update.message.reply_text("ቀን ይምረጡ", reply_markup=ReplyKeyboardMarkup(days_menu, resize_keyboard=True))
 
-    elif text in food_program:
-        await update.message.reply_text(food_program[text])
+    elif text in food:
+        await update.message.reply_text(food[text])
 
-    elif text == "📍 የካፌ location":
-        await update.message.reply_text("location ይምረጡ", reply_markup=ReplyKeyboardMarkup(location_menu, resize_keyboard=True))
+    elif text == "📍 Location":
+        await update.message.reply_text("Location ይምረጡ", reply_markup=ReplyKeyboardMarkup(location_menu, resize_keyboard=True))
 
     elif text in locations:
         await update.message.reply_text(locations[text])
@@ -57,11 +64,13 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("ምግብ ወይም location ይምረጡ")
 
     elif text == "🔙 Back":
-        await update.message.reply_text("Main Menu", reply_markup=ReplyKeyboardMarkup(main_menu, resize_keyboard=True))
+        await update.message.reply_text("Menu", reply_markup=ReplyKeyboardMarkup(main_menu, resize_keyboard=True))
 
+# RUN
 app = ApplicationBuilder().token(TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))
 
+print("Bot is running...")
 app.run_polling()
