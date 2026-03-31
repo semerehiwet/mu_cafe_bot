@@ -1,7 +1,7 @@
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 
-TOKEN = "8146345458:AAFNkn0CwekS4aluEkYIzO8M5pni6tIAPJE"
+TOKEN = "PUT_YOUR_TOKEN_HERE"
 
 main_menu = [["🍽 ምግብ", "📍 Location"], ["❓ Help"]]
 
