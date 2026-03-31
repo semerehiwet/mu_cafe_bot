@@ -3,7 +3,6 @@ from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 
 TOKEN = os.getenv("8146345458:AAFNkn0CwekS4aluEkYIzO8M5pni6tIAPJE")
-
 # ===== MENU =====
 main_menu = [["🍽 የምግብ ፕሮግራም", "📍 የካፌ location"], ["ℹ️ Help"]]
 days_menu = [["ሰኞ", "ማክሰኞ"], ["እሮብ", "ሐሙስ"], ["አርብ", "ቅዳሜ"], ["እሁድ"]]
