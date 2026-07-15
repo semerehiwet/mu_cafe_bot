@@ -46,7 +46,7 @@ init_db()
 def check_password():
     """የይለፍ ቃል ትክክል ከሆነ True ይመልሳል፣ ካልሆነ ግን የመግቢያ ፎርም ያሳያል"""
     def password_entered():
-        if st.session_state["password"] == "125536": # <--- የይለፍ ቃልሽ እዚህ ተቀምጧል
+        if st.session_state["password"] == "semo2753": # <--- የይለፍ ቃልሽ እዚህ ተቀምጧል
             st.session_state["password_correct"] = True
             del st.session_state["password"]  # የይለፍ ቃሉን ከሴሽን ለማጥፋት
         else:
@@ -198,7 +198,7 @@ with menu[0]:
             
             st.markdown("---")
             st.subheader("🎫 የዕጣ አሰጣጥ ዘዴ")
-            ticket_count = st.number_input("ስንት ትኬት ይፈቀድለታል?", min_value=1, value=1, step=1)
+            ticket_count = st.number_input("스ንት ትኬት ይፈቀድለታል?", min_value=1, value=1, step=1)
             
             allocation_mode = st.radio("የዕጣ ቁጥር መመደቢያ መንገድ፦", ["በራስ-ሰር (ከ1-2500 በቅደም ተከተል +1)", "በእጅ ለመምረጥ (በራስህ ቁጥር ለመስጠት)"])
             
@@ -318,21 +318,21 @@ with menu[1]:
             st.dataframe(df_display, use_container_width=True)
             
             # --------------------------------------------------
-            # 🚀 የ Excel ማዘጋጃ (የመጀመሪያው መስመር የዕጣ ቁጥር 1 እንዲሆን + ቁጥሮች እንዲስተካከሉ)
+            # 🚀 የ Excel ማዘጋጃ (በቀላሉ CSV አውርዶ ኤክሴል ላይ መክፈት እንዲቻል)
             # --------------------------------------------------
             # 1. መጀመሪያ ባዶ የዕጣ መዝገበ-ቃላት ከ 1 እስከ 2500 እንፈጥራለን
-            tickets_data = {}
+            tickets_data = []
             for i in range(1, 2501):
-                tickets_data[i] = {
+                tickets_data.append({
                     "የዕጣ ቁጥር": i,
                     "የባለዕድሉ ስም": "",
-                    "ስልክ ቁጥር": None,   # ለጊዜው ባዶ (ቁጥር ስለሚሆን None እናደርገዋለን)
-                    "የተከፈለው ብር": None,   # ለጊዜው ባዶ (ቁጥር ስለሚሆን None እናደርገዋለን)
+                    "ስልክ ቁጥር": "",   
+                    "የተከፈለው ብር": "",   
                     "የላኪ ስም": "",
                     "የተቀባይ ስም": "",
                     "Transaction ID": "",
                     "የተመዘገበበት ቀን": ""
-                }
+                })
             
             # 2. ከዳታቤዝ የመጡትን የተመዘገቡ ዕጣዎች እዚህ ውስጥ እንተካለን
             for row in db_rows:
@@ -341,40 +341,39 @@ with menu[1]:
                     try:
                         ticket_num = int(ticket)
                         if 1 <= ticket_num <= 2500:
-                            tickets_data[ticket_num]["የባለዕድሉ ስም"] = row["ስም"]
+                            idx = ticket_num - 1 # Array index 0 ላይ ስለሚጀምር
+                            tickets_data[idx]["የባለዕድሉ ስም"] = row["ስም"]
                             
                             # ስልክ ቁጥርን ወደ ቁጥር (Integer) እንቀይራለን
                             phone_str = str(row["ስልክ"]).strip()
                             if phone_str.isdigit():
-                                tickets_data[ticket_num]["ስልክ ቁጥር"] = int(phone_str)
+                                tickets_data[idx]["ስልክ ቁጥር"] = int(phone_str)
                             else:
-                                tickets_data[ticket_num]["ስልክ ቁጥር"] = phone_str
+                                tickets_data[idx]["ስልክ ቁጥር"] = phone_str
                             
                             # የብር መጠንን ወደ ቁጥር (Float) እንቀይራለን
-                            tickets_data[ticket_num]["የተከፈለው ብር"] = float(row["ብር"])
+                            tickets_data[idx]["የተከፈለው ብር"] = float(row["ብር"])
                             
-                            tickets_data[ticket_num]["የላኪ ስም"] = row["ላኪ"] if row["ላኪ"] else ""
-                            tickets_data[ticket_num]["የተቀባይ ስም"] = row["ተቀባይ"] if row["ተቀባይ"] else ""
-                            tickets_data[ticket_num]["Transaction ID"] = row["Ref ID"]
-                            tickets_data[ticket_num]["የተመዘገበበት ቀን"] = str(row["ቀን"])
+                            tickets_data[idx]["የላኪ ስም"] = row["ላኪ"] if row["ላኪ"] else ""
+                            tickets_data[idx]["የተቀባይ ስም"] = row["ተቀባይ"] if row["ተቀባይ"] else ""
+                            tickets_data[idx]["Transaction ID"] = row["Ref ID"]
+                            tickets_data[idx]["የተመዘገበበት ቀን"] = str(row["ቀን"])
                     except ValueError:
                         pass
             
-            # 3. መረጃውን ወደ Pandas DataFrame እንቀይረዋለን (ከ 1 እስከ 2500 ከላይ ወደ ታች ይደረደራል)
-            df_final = pd.DataFrame(list(tickets_data.values()))
+            # 3. መረጃውን ወደ Pandas DataFrame እንቀይረዋለን
+            df_final = pd.DataFrame(tickets_data)
             
-            buffer = io.BytesIO()
-            with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-                # header=False በማድረግ የርዕስ ቦታው እንዲጠፋና ዕጣ ቁጥር 1 ቀጥታ ረድፍ 1 ላይ እንዲጀምር ተደርጓል
-                df_final.to_excel(writer, index=False, header=False, sheet_name='ዕጣዎች በዝርዝር')
+            # Excel openpyxl ስለሌለ ወደ CSV ፋይል እንቀይረዋለን (ይህ በሁሉም ኮምፒውተር ላይ ያለ ችግር በኤክሴል ይከፈታል)
+            csv_data = df_final.to_csv(index=False, header=False, encoding='utf-8-sig')
             
             st.markdown("---")
             st.subheader("📥 የዕጣዎችን ዝርዝር በExcel አውርድ")
             st.download_button(
                 label="📊 ሙሉ የዕጣዎች ዝርዝር Excel አውርድ",
-                data=buffer.getvalue(),
-                file_name="gift_lottery_tickets.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                data=csv_data,
+                file_name="gift_lottery_tickets.csv", # በ Excel በቀጥታ የሚከፈት የፋይል አይነት
+                mime="text/csv",
                 use_container_width=True
             )
         else:
