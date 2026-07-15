@@ -5,12 +5,12 @@ import pandas as pd
 from PIL import Image
 from pyzbar.pyzbar import decode
 import re
+import io
 
 # ==========================================
 # 1. የዳታቤዝ ግንኙነት (eu-west-1 Session Pooler 5432 በመጠቀም)
 # ==========================================
 def get_db_connection():
-    # ያንተ ትክክለኛ የይለፍ ቃል እና የSupabase መገናኛ አድራሻ (eu-west-1)
     connection_string = "postgresql://postgres.ocetuxtkfbrepihgddco:semo27537572@aws-0-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require"
     return psycopg2.connect(connection_string)
 
@@ -41,89 +41,70 @@ def init_db():
 init_db()
 
 # ==========================================
-# 2. QR ኮድ አንባቢ እና መረጃ መፍተኛ (የተሻሻለ)
+# 2. የደህንነት መቆጣጠሪያ (አስተዳዳሪ መግቢያ)
+# ==========================================
+def check_password():
+    """የይለፍ ቃል ትክክል ከሆነ True ይመልሳል፣ ካልሆነ ግን የመግቢያ ፎርም ያሳያል"""
+    def password_entered():
+        if st.session_state["password"] == "Mebrit@2026": # <--- የይለፍ ቃልህን እዚህ መቀየር ትችላለህ
+            st.session_state["password_correct"] = True
+            del st.session_state["password"]  # የይለፍ ቃሉን ከሴሽን ለማጥፋት
+        else:
+            st.session_state["password_correct"] = False
+
+    if "password_correct" not in st.session_state:
+        # ገና መግቢያው ከሆነ
+        st.subheader("🔑 የአስተዳዳሪ መግቢያ")
+        st.text_input("የይለፍ ቃል ያስገቡ", type="password", on_change=password_entered, key="password")
+        return False
+    elif not st.session_state["password_correct"]:
+        # የይለፍ ቃል ከተሳሳተ
+        st.subheader("🔑 የአስተዳዳሪ መግቢያ")
+        st.text_input("የይለፍ ቃል ያስገቡ", type="password", on_change=password_entered, key="password")
+        st.error("❌ የተሳሳተ የይለፍ ቃል! እባክዎ እንደገና ይሞክሩ።")
+        return False
+    else:
+        # የይለፍ ቃል ትክክል ከሆነ
+        return True
+
+# የይለፍ ቃሉ ካልተረጋገጠ አፑን እዚህ ጋር ያቆመዋል
+if not check_password():
+    st.stop()
+
+# ==========================================
+# 3. QR ኮድ አንባቢ
 # ==========================================
 def parse_qr_data(qr_text):
     tx_id = "N/A"
-    amount = 0.0
-    sender = "ያልታወቀ ላኪ"
-    receiver = "ያልታወቀ ተቀባይ"
     
-    # 1. የቴሌብር (Telebirr) QR ኮድ ከሆነ
+    # የቴሌብር (Telebirr) QR ኮድ ከሆነ
     if "telebirr" in qr_text.lower() or "webapi.mytelebirr.et" in qr_text:
-        # Transaction ID መፈለግ
         tx_match = re.search(r'transactionId=([A-Za-z0-9]+)', qr_text)
         if tx_match:
             tx_id = tx_match.group(1)
-            
-        # የብር መጠን መፈለግ
-        amt_match = re.search(r'amount=([0-9.]+)', qr_text)
-        if amt_match:
-            amount = float(amt_match.group(1))
-            
-        # የላኪ ስም (ካለ ለማውጣት መሞከር)
-        sender_match = re.search(r'senderName=([^&]+)', qr_text)
-        if sender_match:
-            sender = sender_match.group(1).replace("%20", " ")
-        else:
-            sender = "Telebirr User (ላኪ)"
-            
-        # የተቀባይ ስም
-        receiver_match = re.search(r'receiverName=([^&]+)', qr_text)
-        if receiver_match:
-            receiver = receiver_match.group(1).replace("%20", " ")
-        else:
-            receiver = "የቴሌብር ነጋዴ (Merchant)"
         
-    # 2. የንግድ ባንክ (CBE Birr / CBE) QR ኮድ ከሆነ
+    # የንግድ ባንክ (CBE) QR ኮድ ከሆነ
     elif "cbe" in qr_text.lower() or "combanketh" in qr_text.lower() or "cbebirr" in qr_text.lower():
-        # የግብይት ቁጥር መፈለግ (v2- ወይም CBE በያዘው መሠረት)
-        tx_match = re.search(r'(?:v2-|TXN|Ref-)([A-Za-z0-9]+)', qr_text)
+        tx_match = re.search(r'v2-([A-Za-z0-9]+)', qr_text)
         if tx_match:
             tx_id = tx_match.group(1)
         else:
-            # ሊንኩ ውስጥ በግልጽ ካልተገኘ አጠር ያለ መለያ መስጠት
-            tx_id = qr_text.split('/')[-1][:15] if '/' in qr_text else "CBE-" + qr_text[:10]
+            tx_id = qr_text.split('/')[-1] if '/' in qr_text else qr_text
             
-        # የብር መጠን መፈለግ
-        amt_match = re.search(r'(?:amount|amt|val)=([0-9.]+)', qr_text, re.IGNORECASE)
-        if amt_match:
-            amount = float(amt_match.group(1))
-            
-        # የላኪ ስም
-        sender_match = re.search(r'(?:sender|from)=([^&]+)', qr_text, re.IGNORECASE)
-        if sender_match:
-            sender = sender_match.group(1).replace("%20", " ")
-        else:
-            sender = "CBE User (ላኪ)"
-            
-        # የተቀባይ ስም
-        receiver_match = re.search(r'(?:receiver|to)=([^&]+)', qr_text, re.IGNORECASE)
-        if receiver_match:
-            receiver = receiver_match.group(1).replace("%20", " ")
-        else:
-            receiver = "የንግድ ባንክ አካውንት"
-            
-    # 3. ሌላ ማንኛውም የባንክ QR ኮድ ከሆነ
+    # ሌላ
     else:
-        # አጠቃላይ ጽሑፉን መፈተሽ
         tx_match = re.search(r'(?:TXN|Ref|ID|Transaction)[:=\s-]*([A-Za-z0-9]+)', qr_text, re.IGNORECASE)
         if tx_match:
             tx_id = tx_match.group(1)
         else:
             tx_id = f"QR-{qr_text[:12]}"
             
-        amt_match = re.search(r'(?:amount|amt|ብር|ብር መጠን)[:=\s-]*([0-9.]+)', qr_text, re.IGNORECASE)
-        if amt_match:
-            amount = float(amt_match.group(1))
-            
-    return tx_id, amount, sender, receiver
+    return tx_id
 
 # ==========================================
-# 3. የዕጣ ቁጥር ማመንጫ (ከ 1 እስከ 2500)
+# 4. የዕጣ ቁጥር ማመንጫ (ከ 1 እስከ 2500)
 # ==========================================
 def get_allocated_tickets():
-    """ቀድሞ የተያዙ የዕጣ ቁጥሮችን በሙሉ ይመልሳል"""
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT ticket_numbers FROM customer_tickets")
@@ -139,7 +120,6 @@ def get_allocated_tickets():
     return used
 
 def generate_auto_tickets(count, used_tickets):
-    """ከ1 እስከ 2500 ባለው ውስጥ ያልተያዙ የዕጣ ቁጥሮችን በቅደም ተከተል ይሰጣል"""
     allocated = []
     current = 1
     while len(allocated) < count and current <= 2500:
@@ -149,10 +129,14 @@ def generate_auto_tickets(count, used_tickets):
     return allocated
 
 # ==========================================
-# 4. የዌብሳይት ዲዛይን (UI)
+# 5. የዌብሳይት ዲዛይን (UI)
 # ==========================================
-st.set_page_config(page_title="የስጦታ ዕጣ መቆጣጠሪያ", layout="centered")
 st.title("🏆 የስጦታ ዕጣ መቆጣጠሪያ ዌብሳይት")
+
+# Logout ማድረጊያ በተን በቀኝ በኩል
+if st.sidebar.button("🔒 መተግበሪያውን ዝጋ (Logout)"):
+    st.session_state["password_correct"] = False
+    st.rerun()
 
 menu = st.tabs(["📤 አዲስ ደረሰኝ መመዝገቢያ", "📋 የተመዘገቡ ዕጣዎች ዝርዝር"])
 
@@ -164,14 +148,12 @@ with menu[0]:
         image = Image.open(uploaded_file)
         st.image(image, caption="የተጫነው ደረሰኝ", width=300)
         
-        # QR ኮዱን ማንበብ
         detected_qr = decode(image)
         
         if detected_qr:
             qr_text = detected_qr[0].data.decode('utf-8')
-            tx_id, amount, sender, receiver = parse_qr_data(qr_text)
+            tx_id = parse_qr_data(qr_text)
             
-            # በዳታቤዝ ውስጥ ደረሰኙ ቀድሞ መኖሩን ማረጋገጥ
             conn = get_db_connection()
             cursor = conn.cursor(cursor_factory=RealDictCursor)
             cursor.execute("SELECT * FROM customer_tickets WHERE transaction_id = %s", (tx_id,))
@@ -180,23 +162,34 @@ with menu[0]:
             conn.close()
             
             st.markdown("---")
-            st.subheader("🔍 ከQR ኮድ የተገኙ ዝርዝር መረጃዎች")
+            st.subheader("🔍 የደረሰኝ ማረጋገጫ ሊንክ")
             
-            # የQR ኮዱን ትክክለኛ ሊንክ/ጽሑፍ እዚህ በግልጽ እናሳያለን
-            st.info(f"🔗 **ትክክለኛ የ QR Code ሊንክ (Raw Data)፦** \n`{qr_text}`")
+            if qr_text.startswith("http"):
+                st.link_button("🌐 ወደ ባንክ መረጃው ቀጥታ ለመሄድ እዚህ ይጫኑ", qr_text, use_container_width=True, type="primary")
+                st.info(f"🔗 **የ QR Code ሙሉ ሊንክ፦** {qr_text}")
+            else:
+                st.warning("⚠️ በQR ኮዱ ውስጥ ምንም የድረ-ገጽ ሊንክ አልተገኘም!")
             
-            # የደረሰኝ ድግግሞሽ ቼክ
+            st.markdown("---")
+            
+            # የተደገመ ደረሰኝ ምርመራ
             if existing_record:
-                st.error(f"🚨 ይህ ደረሰኝ ቀደም ሲል ጥቅም ላይ ውሏል! (የተደገመ ደረሰኝ) \n\n* የተመዘገበበት ስም፦ {existing_record['customer_name']} \n* የዕጣ ቁጥሮች፦ {existing_record['ticket_numbers']}")
-                st.stop() # አፑ እዚህ ላይ ይቆማል፣ እንዲመዘገብ አይፈቅድም
+                st.error(f"""
+                🚨 **ይህ ደረሰኝ ቀደም ሲል ጥቅም ላይ ውሏል! (የተደገመ ደረሰኝ)**
+                
+                * **የተመዘገበበት ስም፦** {existing_record['customer_name']} 
+                * **የተሰጠው የዕጣ ቁጥር፦** {existing_record['ticket_numbers']} 🎫
+                * **ስልክ ቁጥር፦** {existing_record['customer_phone']}
+                """)
+                st.stop()
             else:
                 st.success("✅ አዲስ ደረሰኝ! ከዚህ በፊት ጥቅም ላይ አልዋለም።")
             
-            # መረጃውን በእጅ ማስተካከል እና ማየት እንዲቻል በሳጥን ማሳየት
+            st.subheader("📝 የደረሰኝ መረጃዎች")
             edit_tx_id = st.text_input("የግብይት መለያ (Transaction ID)", value=tx_id)
-            edit_amount = st.number_input("የተላከው ብር መጠን", value=float(amount), min_value=0.0)
-            edit_sender = st.text_input("የላኪ ስም (Sender Name)", value=sender)
-            edit_receiver = st.text_input("የተቀባይ ስም (Receiver Name)", value=receiver)
+            edit_amount = st.number_input("የተላከው ብር መጠን (Amount)", min_value=0.0, step=1.0)
+            edit_sender = st.text_input("የላኪ ስም (Sender Name)", placeholder="የላኪውን ስም እዚህ ይጻፉ...")
+            edit_receiver = st.text_input("የተቀባይ ስም (Receiver Name)", placeholder="የተቀባዩን ስም እዚህ ይጻፉ...")
             
             st.markdown("---")
             st.subheader("👤 የባለዕድሉ መረጃ")
@@ -224,7 +217,6 @@ with menu[0]:
                 if manual_input:
                     try:
                         temp_tickets = [int(x.strip()) for x in manual_input.split(",") if x.strip()]
-                        # ድግግሞሽ ቼክ
                         conflicts = [t for t in temp_tickets if t in used_tickets]
                         out_of_range = [t for t in temp_tickets if t < 1 or t > 2500]
                         
@@ -241,10 +233,11 @@ with menu[0]:
                         st.error("❌ እባክዎ ቁጥሮችን ብቻ ያስገቡ!")
             
             st.markdown("---")
-            # የመመዝገቢያ አዝራር
             if st.button("አረጋግጥ እና መዝግብ (Accept & Save)"):
                 if not c_name or not c_phone:
                     st.error("❌ እባክዎ የስም እና ስልክ መረጃዎችን ይሙሉ!")
+                elif edit_amount <= 0:
+                    st.error("❌ እባክዎ የተላከውን የብር መጠን ያስገቡ!")
                 elif not final_tickets:
                     st.error("❌ የሚሰጥ የዕጣ ቁጥር አልተመረጠም!")
                 else:
@@ -271,29 +264,109 @@ with menu[0]:
         else:
             st.error("❌ በምስሉ ላይ ምንም የQR ኮድ ሊነበብ አልቻለም! እባክዎ ግልጽ የሆነ ፎቶ ይጫኑ።")
 
+# ==========================================
+# 6. የተመዘገቡ ባለዕድሎች ዝርዝር እና የኤክሰል ማውረጃ
+# ==========================================
 with menu[1]:
     st.subheader("📋 የተመዘገቡ ባለዕድሎች ዝርዝር")
+    search_query = st.text_input("በስም፣ በስልክ ቁጥር ወይም በዕጣ ቁጥር ይፈልጉ...")
     
-    search_query = st.text_input("በስም ወይም በስልክ ይፈልጉ...")
-    
+    db_rows = []
     try:
         conn = get_db_connection()
         if search_query:
             query = """
                 SELECT customer_name as ስም, customer_phone as ስልክ, ticket_numbers as "የዕጣ ቁጥሮች", amount as ብር, sender_name as ላኪ, receiver_name as ተቀባይ, transaction_id as "Ref ID", created_at as ቀን 
                 FROM customer_tickets 
-                WHERE customer_name ILIKE %s OR customer_phone ILIKE %s 
+                WHERE customer_name ILIKE %s 
+                   OR customer_phone ILIKE %s 
+                   OR ticket_numbers LIKE %s 
+                   OR ticket_numbers LIKE %s
+                   OR ticket_numbers LIKE %s
+                   OR ticket_numbers = %s
                 ORDER BY id DESC
             """
-            df = pd.read_sql(query, conn, params=(f"%{search_query}%", f"%{search_query}%"))
+            exact_match = search_query.strip()
+            param_like_start = f"%,{exact_match}"
+            param_like_end = f"{exact_match},%"
+            param_like_middle = f"%,{exact_match},%"
+            
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor.execute(query, (
+                f"%{search_query}%", 
+                f"%{search_query}%", 
+                param_like_start, 
+                param_like_end, 
+                param_like_middle, 
+                exact_match
+            ))
+            db_rows = cursor.fetchall()
+            cursor.close()
         else:
-            df = pd.read_sql("""
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor.execute("""
                 SELECT customer_name as ስም, customer_phone as ስልክ, ticket_numbers as "የዕጣ ቁጥሮች", amount as ብር, sender_name as ላኪ, receiver_name as ተቀባይ, transaction_id as "Ref ID", created_at as ቀን 
                 FROM customer_tickets 
                 ORDER BY id DESC
-            """, conn)
+            """)
+            db_rows = cursor.fetchall()
+            cursor.close()
         conn.close()
         
-        st.dataframe(df, use_container_width=True)
+        if db_rows:
+            df_display = pd.DataFrame(db_rows)
+            st.dataframe(df_display, use_container_width=True)
+            
+            # --------------------------------------------------
+            # 🚀 የ Excel ማዘጋጃ (የመጀመሪያው መስመር የዕጣ ቁጥር 1 እንዲሆን)
+            # --------------------------------------------------
+            excel_rows = []
+            for i in range(1, 2501):
+                excel_rows.append({
+                    "የዕጣ ቁጥር": i,
+                    "የባለዕድሉ ስም": "",
+                    "ስልክ ቁጥር": "",
+                    "የተከፈለው ብር": "",
+                    "የላኪ ስም": "",
+                    "የተቀባይ ስም": "",
+                    "Transaction ID": "",
+                    "የተመዘገበበት ቀን": ""
+                })
+            
+            df_template = pd.DataFrame(excel_rows)
+            df_template.set_index("የዕጣ ቁጥር", inplace=True)
+            
+            for row in db_rows:
+                tickets_list = [t.strip() for t in str(row["የዕጣ ቁጥሮች"]).split(",") if t.strip()]
+                for ticket in tickets_list:
+                    ticket_num = int(ticket)
+                    if 1 <= ticket_num <= 2500:
+                        df_template.at[ticket_num, "የባለዕድሉ ስም"] = row["ስም"]
+                        df_template.at[ticket_num, "ስልክ ቁጥር"] = row["ስልክ"]
+                        df_template.at[ticket_num, "የተከፈለው ብር"] = float(row["ብር"])
+                        df_template.at[ticket_num, "የላኪ ስም"] = row["ላኪ"]
+                        df_template.at[ticket_num, "የተቀባይ ስም"] = row["ተቀባይ"]
+                        df_template.at[ticket_num, "Transaction ID"] = row["Ref ID"]
+                        df_template.at[ticket_num, "የተመዘገበበት ቀን"] = str(row["ቀን"])
+            
+            df_final = df_template.reset_index()
+            
+            buffer = io.BytesIO()
+            with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+                # header=False በማድረግ የርዕስ ቦታው እንዲጠፋና ዕጣ ቁጥር 1 ቀጥታ ረድፍ 1 ላይ እንዲጀምር ተደርጓል
+                df_final.to_excel(writer, index=False, header=False, sheet_name='ዕጣዎች በዝርዝር')
+            
+            st.markdown("---")
+            st.subheader("📥 የዕጣዎችን ዝርዝር በExcel አውርድ")
+            st.download_button(
+                label="📊 ሙሉ የዕጣዎች ዝርዝር Excel አውርድ",
+                data=buffer.getvalue(),
+                file_name="gift_lottery_tickets.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )
+        else:
+            st.info("ምንም መረጃ አልተገኘም!")
+            
     except Exception as e:
-        st.info("ምንም መረጃ የለም ወይም ስህተት ተፈጥሯል!")
+        st.info(f"ስህተት ተፈጥሯል፦ {e}")
