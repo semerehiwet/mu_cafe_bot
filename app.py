@@ -46,7 +46,7 @@ init_db()
 def check_password():
     """የይለፍ ቃል ትክክል ከሆነ True ይመልሳል፣ ካልሆነ ግን የመግቢያ ፎርም ያሳያል"""
     def password_entered():
-        if st.session_state["password"] == "Mebrit@2026": # <--- የይለፍ ቃልህን እዚህ መቀየር ትችላለህ
+        if st.session_state["password"] == "semo2753": # <--- የይለፍ ቃልህን እዚህ መቀየር ትችላለህ
             st.session_state["password_correct"] = True
             del st.session_state["password"]  # የይለፍ ቃሉን ከሴሽን ለማጥፋት
         else:
