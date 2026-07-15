@@ -7,11 +7,11 @@ from pyzbar.pyzbar import decode
 import re
 
 # ==========================================
-# 1. የዳታቤዝ ግንኙነት (IPv4 Pooler 6543 በመጠቀም)
+# 1. የዳታቤዝ ግንኙነት (eu-west-1 Session Pooler 5432 በመጠቀም)
 # ==========================================
 def get_db_connection():
-    # ያንተ ትክክለኛ የይለፍ ቃል እና የSupabase መገናኛ አድራሻ
-    connection_string = "postgresql://postgres.ocetuxtkfbrepihgddco:semo27537572@aws-0-eu-central-1.pooler.supabase.com:6543/postgres?sslmode=require"
+    # ያንተ ትክክለኛ የይለፍ ቃል እና የSupabase መገናኛ አድራሻ (eu-west-1)
+    connection_string = "postgresql://postgres.ocetuxtkfbrepihgddco:semo27537572@aws-0-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require"
     return psycopg2.connect(connection_string)
 
 # ሰንጠረዥ መፍጠሪያ
