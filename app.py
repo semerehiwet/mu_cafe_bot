@@ -46,7 +46,7 @@ init_db()
 def check_password():
     """የይለፍ ቃል ትክክል ከሆነ True ይመልሳል፣ ካልሆነ ግን የመግቢያ ፎርም ያሳያል"""
     def password_entered():
-        if st.session_state["password"] == "semo2753": # <--- የይለፍ ቃልህን እዚህ መቀየር ትችላለህ
+        if st.session_state["password"] == "125536": # <--- የይለፍ ቃልሽ እዚህ ተቀምጧል
             st.session_state["password_correct"] = True
             del st.session_state["password"]  # የይለፍ ቃሉን ከሴሽን ለማጥፋት
         else:
@@ -318,38 +318,50 @@ with menu[1]:
             st.dataframe(df_display, use_container_width=True)
             
             # --------------------------------------------------
-            # 🚀 የ Excel ማዘጋጃ (የመጀመሪያው መስመር የዕጣ ቁጥር 1 እንዲሆን)
+            # 🚀 የ Excel ማዘጋጃ (የመጀመሪያው መስመር የዕጣ ቁጥር 1 እንዲሆን + ቁጥሮች እንዲስተካከሉ)
             # --------------------------------------------------
-            excel_rows = []
+            # 1. መጀመሪያ ባዶ የዕጣ መዝገበ-ቃላት ከ 1 እስከ 2500 እንፈጥራለን
+            tickets_data = {}
             for i in range(1, 2501):
-                excel_rows.append({
+                tickets_data[i] = {
                     "የዕጣ ቁጥር": i,
                     "የባለዕድሉ ስም": "",
-                    "ስልክ ቁጥር": "",
-                    "የተከፈለው ብር": "",
+                    "ስልክ ቁጥር": None,   # ለጊዜው ባዶ (ቁጥር ስለሚሆን None እናደርገዋለን)
+                    "የተከፈለው ብር": None,   # ለጊዜው ባዶ (ቁጥር ስለሚሆን None እናደርገዋለን)
                     "የላኪ ስም": "",
                     "የተቀባይ ስም": "",
                     "Transaction ID": "",
                     "የተመዘገበበት ቀን": ""
-                })
+                }
             
-            df_template = pd.DataFrame(excel_rows)
-            df_template.set_index("የዕጣ ቁጥር", inplace=True)
-            
+            # 2. ከዳታቤዝ የመጡትን የተመዘገቡ ዕጣዎች እዚህ ውስጥ እንተካለን
             for row in db_rows:
                 tickets_list = [t.strip() for t in str(row["የዕጣ ቁጥሮች"]).split(",") if t.strip()]
                 for ticket in tickets_list:
-                    ticket_num = int(ticket)
-                    if 1 <= ticket_num <= 2500:
-                        df_template.at[ticket_num, "የባለዕድሉ ስም"] = row["ስም"]
-                        df_template.at[ticket_num, "ስልክ ቁጥር"] = row["ስልክ"]
-                        df_template.at[ticket_num, "የተከፈለው ብር"] = float(row["ብር"])
-                        df_template.at[ticket_num, "የላኪ ስም"] = row["ላኪ"]
-                        df_template.at[ticket_num, "የተቀባይ ስም"] = row["ተቀባይ"]
-                        df_template.at[ticket_num, "Transaction ID"] = row["Ref ID"]
-                        df_template.at[ticket_num, "የተመዘገበበት ቀን"] = str(row["ቀን"])
+                    try:
+                        ticket_num = int(ticket)
+                        if 1 <= ticket_num <= 2500:
+                            tickets_data[ticket_num]["የባለዕድሉ ስም"] = row["ስም"]
+                            
+                            # ስልክ ቁጥርን ወደ ቁጥር (Integer) እንቀይራለን
+                            phone_str = str(row["ስልክ"]).strip()
+                            if phone_str.isdigit():
+                                tickets_data[ticket_num]["ስልክ ቁጥር"] = int(phone_str)
+                            else:
+                                tickets_data[ticket_num]["ስልክ ቁጥር"] = phone_str
+                            
+                            # የብር መጠንን ወደ ቁጥር (Float) እንቀይራለን
+                            tickets_data[ticket_num]["የተከፈለው ብር"] = float(row["ብር"])
+                            
+                            tickets_data[ticket_num]["የላኪ ስም"] = row["ላኪ"] if row["ላኪ"] else ""
+                            tickets_data[ticket_num]["የተቀባይ ስም"] = row["ተቀባይ"] if row["ተቀባይ"] else ""
+                            tickets_data[ticket_num]["Transaction ID"] = row["Ref ID"]
+                            tickets_data[ticket_num]["የተመዘገበበት ቀን"] = str(row["ቀን"])
+                    except ValueError:
+                        pass
             
-            df_final = df_template.reset_index()
+            # 3. መረጃውን ወደ Pandas DataFrame እንቀይረዋለን (ከ 1 እስከ 2500 ከላይ ወደ ታች ይደረደራል)
+            df_final = pd.DataFrame(list(tickets_data.values()))
             
             buffer = io.BytesIO()
             with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
@@ -369,4 +381,4 @@ with menu[1]:
             st.info("ምንም መረጃ አልተገኘም!")
             
     except Exception as e:
-        st.info(f"ስህተት ተፈጥሯል፦ {e}")
+        st.error(f"ስህተት ተፈጥሯል፦ {e}")
