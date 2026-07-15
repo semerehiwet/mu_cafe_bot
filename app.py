@@ -8,30 +8,35 @@ from pyzbar.pyzbar import decode
 import io
 
 # ==========================================
-# 1. የዳታቤዝ ግንኙነት (ከSecrets የሚነበብ)
+# 1. የዳታቤዝ ግንኙነት (ቀጥታ እዚሁ ተጽፏል)
 # ==========================================
 def get_db_connection():
-    # በStreamlit Secrets ውስጥ የተቀመጠውን DATABASE_URL ይጠቀማል
-    return psycopg2.connect(st.secrets["DATABASE_URL"])
+    # ⚠️ ምንም አይነት Secrets ሳያስፈልግ በቀጥታ ይገናኛል (የደህንነት ሰርተፍኬት ችግር እንዳይፈጠር sslmode ተጨምሯል)
+    return psycopg2.connect(
+        "postgresql://postgres.ocetuxtkfbrepihgddco:%40semo27537572@aws-0-eu-central-1.pooler.supabase.com:6543/postgres?sslmode=require"
+    )
 
 # ሰንጠረዡን መፍጠር (ከሌለ)
 def init_db():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS lottery_tickets (
-        id SERIAL PRIMARY KEY,
-        transaction_id VARCHAR(100) UNIQUE, 
-        bank_name VARCHAR(100),
-        customer_name VARCHAR(100),
-        customer_phone VARCHAR(20),
-        ticket_numbers TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-    """)
-    conn.commit()
-    cursor.close()
-    conn.close()
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS lottery_tickets (
+            id SERIAL PRIMARY KEY,
+            transaction_id VARCHAR(100) UNIQUE, 
+            bank_name VARCHAR(100),
+            customer_name VARCHAR(100),
+            customer_phone VARCHAR(20),
+            ticket_numbers TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """)
+        conn.commit()
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        st.error(f"❌ የዳታቤዝ ሰንጠረዥ መፍጠር አልተቻለም፦ {e}")
 
 # መተግበሪያውን ስታስጀምር ዳታቤዙን አዘጋጅ
 init_db()
@@ -42,7 +47,6 @@ st.set_page_config(page_title="የእጣ መቆጣጠሪያ", layout="centered")
 # 2. የQR ኮድ ማንበቢያ
 # ==========================================
 def parse_receipt_qr(qr_data):
-    # ባንኮችን እና መለያ ቁጥራቸውን ለመለየት
     if "telebirr" in qr_data.lower() or "webapi.mytelebirr.et" in qr_data:
         match = re.search(r'transactionId=([A-Za-z0-9]+)', qr_data)
         return "Telebirr", (match.group(1) if match else f"TEL-{random.randint(1000, 9999)}")
@@ -138,5 +142,5 @@ with menu[1]:
         df = pd.read_sql("SELECT customer_name as ስም, customer_phone as ስልክ, ticket_numbers as እጣ, transaction_id as ID FROM lottery_tickets ORDER BY id DESC", conn)
         conn.close()
         st.dataframe(df, use_container_width=True)
-    except:
-        st.info("መረጃ ባዶ ነው።")
+    except Exception as e:
+        st.info(f"መረጃ ባዶ ነው ወይም ስህተት ተፈጥሯል፦ {e}")
