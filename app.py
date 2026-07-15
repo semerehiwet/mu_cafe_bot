@@ -41,32 +41,82 @@ def init_db():
 init_db()
 
 # ==========================================
-# 2. QR ኮድ አንባቢ እና መረጃ መፍተኛ
+# 2. QR ኮድ አንባቢ እና መረጃ መፍተኛ (የተሻሻለ)
 # ==========================================
 def parse_qr_data(qr_text):
-    tx_id, amount, sender, receiver = "N/A", 0.0, "ያልታወቀ", "ያልታወቀ"
+    tx_id = "N/A"
+    amount = 0.0
+    sender = "ያልታወቀ ላኪ"
+    receiver = "ያልታወቀ ተቀባይ"
     
-    # የቴሌብር (telebirr) መለያዎችን መፈለግ
+    # 1. የቴሌብር (Telebirr) QR ኮድ ከሆነ
     if "telebirr" in qr_text.lower() or "webapi.mytelebirr.et" in qr_text:
+        # Transaction ID መፈለግ
         tx_match = re.search(r'transactionId=([A-Za-z0-9]+)', qr_text)
         if tx_match:
             tx_id = tx_match.group(1)
+            
+        # የብር መጠን መፈለግ
         amt_match = re.search(r'amount=([0-9.]+)', qr_text)
         if amt_match:
             amount = float(amt_match.group(1))
-        sender = "Telebirr User"
+            
+        # የላኪ ስም (ካለ ለማውጣት መሞከር)
+        sender_match = re.search(r'senderName=([^&]+)', qr_text)
+        if sender_match:
+            sender = sender_match.group(1).replace("%20", " ")
+        else:
+            sender = "Telebirr User (ላኪ)"
+            
+        # የተቀባይ ስም
+        receiver_match = re.search(r'receiverName=([^&]+)', qr_text)
+        if receiver_match:
+            receiver = receiver_match.group(1).replace("%20", " ")
+        else:
+            receiver = "የቴሌብር ነጋዴ (Merchant)"
         
-    # የCBE (የኢትዮጵያ ንግድ ባንክ) መለያዎችን መፈለግ
-    elif "cbe" in qr_text.lower() or "combanketh" in qr_text.lower():
-        tx_match = re.search(r'v2-([A-Za-z0-9]+)', qr_text)
+    # 2. የንግድ ባንክ (CBE Birr / CBE) QR ኮድ ከሆነ
+    elif "cbe" in qr_text.lower() or "combanketh" in qr_text.lower() or "cbebirr" in qr_text.lower():
+        # የግብይት ቁጥር መፈለግ (v2- ወይም CBE በያዘው መሠረት)
+        tx_match = re.search(r'(?:v2-|TXN|Ref-)([A-Za-z0-9]+)', qr_text)
         if tx_match:
             tx_id = tx_match.group(1)
-        sender = "CBE User"
-        
+        else:
+            # ሊንኩ ውስጥ በግልጽ ካልተገኘ አጠር ያለ መለያ መስጠት
+            tx_id = qr_text.split('/')[-1][:15] if '/' in qr_text else "CBE-" + qr_text[:10]
+            
+        # የብር መጠን መፈለግ
+        amt_match = re.search(r'(?:amount|amt|val)=([0-9.]+)', qr_text, re.IGNORECASE)
+        if amt_match:
+            amount = float(amt_match.group(1))
+            
+        # የላኪ ስም
+        sender_match = re.search(r'(?:sender|from)=([^&]+)', qr_text, re.IGNORECASE)
+        if sender_match:
+            sender = sender_match.group(1).replace("%20", " ")
+        else:
+            sender = "CBE User (ላኪ)"
+            
+        # የተቀባይ ስም
+        receiver_match = re.search(r'(?:receiver|to)=([^&]+)', qr_text, re.IGNORECASE)
+        if receiver_match:
+            receiver = receiver_match.group(1).replace("%20", " ")
+        else:
+            receiver = "የንግድ ባንክ አካውንት"
+            
+    # 3. ሌላ ማንኛውም የባንክ QR ኮድ ከሆነ
     else:
-        # አጠቃላይ የQR መረጃ ከሆነ
-        tx_id = f"QR-{qr_text[:10]}"
-        
+        # አጠቃላይ ጽሑፉን መፈተሽ
+        tx_match = re.search(r'(?:TXN|Ref|ID|Transaction)[:=\s-]*([A-Za-z0-9]+)', qr_text, re.IGNORECASE)
+        if tx_match:
+            tx_id = tx_match.group(1)
+        else:
+            tx_id = f"QR-{qr_text[:12]}"
+            
+        amt_match = re.search(r'(?:amount|amt|ብር|ብር መጠን)[:=\s-]*([0-9.]+)', qr_text, re.IGNORECASE)
+        if amt_match:
+            amount = float(amt_match.group(1))
+            
     return tx_id, amount, sender, receiver
 
 # ==========================================
@@ -130,7 +180,10 @@ with menu[0]:
             conn.close()
             
             st.markdown("---")
-            st.subheader("🔍 ከQR ኮድ የተገኘ መረጃ")
+            st.subheader("🔍 ከQR ኮድ የተገኙ ዝርዝር መረጃዎች")
+            
+            # የQR ኮዱን ትክክለኛ ሊንክ/ጽሑፍ እዚህ በግልጽ እናሳያለን
+            st.info(f"🔗 **ትክክለኛ የ QR Code ሊንክ (Raw Data)፦** \n`{qr_text}`")
             
             # የደረሰኝ ድግግሞሽ ቼክ
             if existing_record:
@@ -139,11 +192,11 @@ with menu[0]:
             else:
                 st.success("✅ አዲስ ደረሰኝ! ከዚህ በፊት ጥቅም ላይ አልዋለም።")
             
-            # መረጃውን በእጅ ማስተካከል እንዲቻል በሳጥን ማሳየት
+            # መረጃውን በእጅ ማስተካከል እና ማየት እንዲቻል በሳጥን ማሳየት
             edit_tx_id = st.text_input("የግብይት መለያ (Transaction ID)", value=tx_id)
             edit_amount = st.number_input("የተላከው ብር መጠን", value=float(amount), min_value=0.0)
-            edit_sender = st.text_input("ከማን ተላከ (Sender)", value=sender)
-            edit_receiver = st.text_input("ለማን ተላከ (Receiver)", value=receiver)
+            edit_sender = st.text_input("የላኪ ስም (Sender Name)", value=sender)
+            edit_receiver = st.text_input("የተቀባይ ስም (Receiver Name)", value=receiver)
             
             st.markdown("---")
             st.subheader("👤 የባለዕድሉ መረጃ")
@@ -227,7 +280,7 @@ with menu[1]:
         conn = get_db_connection()
         if search_query:
             query = """
-                SELECT customer_name as ስም, customer_phone as ስልክ, ticket_numbers as "የዕጣ ቁጥሮች", amount as ብር, transaction_id as "Ref ID", created_at as ቀን 
+                SELECT customer_name as ስም, customer_phone as ስልክ, ticket_numbers as "የዕጣ ቁጥሮች", amount as ብር, sender_name as ላኪ, receiver_name as ተቀባይ, transaction_id as "Ref ID", created_at as ቀን 
                 FROM customer_tickets 
                 WHERE customer_name ILIKE %s OR customer_phone ILIKE %s 
                 ORDER BY id DESC
@@ -235,7 +288,7 @@ with menu[1]:
             df = pd.read_sql(query, conn, params=(f"%{search_query}%", f"%{search_query}%"))
         else:
             df = pd.read_sql("""
-                SELECT customer_name as ስም, customer_phone as ስልክ, ticket_numbers as "የዕጣ ቁጥሮች", amount as ብር, transaction_id as "Ref ID", created_at as ቀን 
+                SELECT customer_name as ስም, customer_phone as ስልክ, ticket_numbers as "የዕጣ ቁጥሮች", amount as ብር, sender_name as ላኪ, receiver_name as ተቀባይ, transaction_id as "Ref ID", created_at as ቀን 
                 FROM customer_tickets 
                 ORDER BY id DESC
             """, conn)
