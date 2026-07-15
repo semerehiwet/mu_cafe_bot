@@ -1,6 +1,5 @@
 streamlit
+psycopg2-binary
 pandas
-numpy
-opencv-python-headless
-pyzbar
 Pillow
+pyzbar
