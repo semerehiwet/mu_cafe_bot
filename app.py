@@ -186,6 +186,12 @@ with menu[0]:
             st.subheader("📝 የደረሰኝ መረጃዎች")
             edit_tx_id = st.text_input("የግብይት መለያ (Transaction ID)", value=tx_id)
             edit_amount = st.number_input("የተላከው ብር መጠን (Amount)", min_value=0.0, step=1.0)
+            
+            # --- እዚህ ጋር የትኬት ስሌት ተጨምሯል ---
+            ticket_count = int(edit_amount // 2500)
+            st.info(f"💡 የገባው ብር ለ **{ticket_count}** ትኬት ይበቃል (ለ 2500 ተከፍሎ)")
+            # -----------------------------------
+            
             edit_sender = st.text_input("የላኪ ስም (Sender Name)", placeholder="የላኪውን ስም እዚህ ይጻፉ...")
             edit_receiver = st.text_input("የተቀባይ ስም (Receiver Name)", placeholder="የተቀባዩን ስም እዚህ ይጻፉ...")
             
@@ -196,20 +202,23 @@ with menu[0]:
             
             st.markdown("---")
             st.subheader("🎫 የዕጣ አሰጣጥ ዘዴ")
-            ticket_count = st.number_input("ስንት ትኬት ይፈቀድለታል?", min_value=1, value=1, step=1)
             
+            # ቀድሞ የነበረውን የትኬት ብዛት መምረጫ አጥፍተን፣ ከላይ የተሰላውን ticket_count እንጠቀምበታለን
             allocation_mode = st.radio("የዕጣ ቁጥር መመደቢያ መንገድ፦", ["በራስ-ሰር (ከ1-2500 በቅደም ተከተል +1)", "በእጅ ለመምረጥ (በራስህ ቁጥር ለመስጠት)"])
             
             used_tickets = get_allocated_tickets()
             final_tickets = []
             
             if allocation_mode == "በራስ-ሰር (ከ1-2500 በቅደም ተከተል +1)":
-                auto_gen = generate_auto_tickets(ticket_count, used_tickets)
-                if len(auto_gen) < ticket_count:
-                    st.warning("⚠️ በቂ ክፍት የዕጣ ቁጥር ከ 1 እስከ 2500 ውስጥ አልተገኘም!")
+                if ticket_count < 1:
+                    st.warning("⚠️ ለዕጣ ለመሳተፍ ቢያንስ 2500 ብር መላክ አለብህ!")
                 else:
-                    final_tickets = auto_gen
-                    st.info(f"💡 የሚሰጡት የዕጣ ቁጥሮች፦ {', '.join(map(str, final_tickets))}")
+                    auto_gen = generate_auto_tickets(ticket_count, used_tickets)
+                    if len(auto_gen) < ticket_count:
+                        st.warning("⚠️ በቂ ክፍት የዕጣ ቁጥር ከ 1 እስከ 2500 ውስጥ አልተገኘም!")
+                    else:
+                        final_tickets = auto_gen
+                        st.info(f"💡 የሚሰጡት የዕጣ ቁጥሮች፦ {', '.join(map(str, final_tickets))}")
             else:
                 manual_input = st.text_input("የዕጣ ቁጥሮችን በኮማ (,) በመለየት ያስገቡ (ለምሳሌ፦ 5, 12, 105)፦")
                 if manual_input:
@@ -232,7 +241,6 @@ with menu[0]:
             
             st.markdown("---")
             if st.button("አረጋግጥ እና መዝግብ (Accept & Save)"):
-                # ስልክ ቁጥሩን ቼክ ማድረጊያ Regex (ከተፈለገ በ '+' ሊጀምር ይችላል፣ በመቀጠል ቢያንስ 10 አሃዞች መኖር አለበት)
                 phone_pattern = r'^\+?[0-9]{10,}$'
                 clean_phone = c_phone.replace(" ", "").strip()
                 
@@ -242,8 +250,8 @@ with menu[0]:
                     st.error("❌ እባክዎ የባለዕድሉን ስልክ ቁጥር ያስገቡ!")
                 elif not re.match(phone_pattern, clean_phone):
                     st.error("❌ ስህተት፦ የስልክ ቁጥሩ ቢያንስ 10 አሃዞች (ቁጥሮች) መሆን አለበት! (ምሳሌ፦ 0912345678 ወይም +251912345678)")
-                elif edit_amount <= 0:
-                    st.error("❌ እባክዎ የተላከውን የብር መጠን ያስገቡ!")
+                elif edit_amount < 2500:
+                    st.error("❌ ለዕጣ ለመሳተፍ ቢያንስ 2500 ብር መላክ አለብህ!")
                 elif not final_tickets:
                     st.error("❌ የሚሰጥ የዕጣ ቁጥር አልተመረጠም!")
                 else:
@@ -276,10 +284,7 @@ with menu[0]:
 with menu[1]:
     st.subheader("📋 የተመዘገቡ ባለዕድሎች ዝርዝር")
     
-    # የፍለጋ ሳጥን
     search_query = st.text_input("በስም፣ በስልክ ቁጥር ወይም በዕጣ ቁጥር ይፈልጉ...")
-    
-    # 🔄 አዲሱ የመደርደሪያ ምርጫ (Sort Options)
     sort_by = st.selectbox(
         "📋 መረጃዎችን መደርደሪያ (Sort By)፦",
         [
@@ -292,7 +297,6 @@ with menu[1]:
     db_rows = []
     try:
         conn = get_db_connection()
-        # ለወቅታዊው ዙር የሚታዩት የዕጣ ቁጥር ያላቸው (ያልተሰረዙት) ብቻ ናቸው
         if search_query:
             query = """
                 SELECT customer_name as ስም, customer_phone as ስልክ, ticket_numbers as "የዕጣ ቁጥሮች", amount as ብር, sender_name as ላኪ, receiver_name as ተቀባይ, transaction_id as "Ref ID", created_at as ቀን 
@@ -336,7 +340,6 @@ with menu[1]:
         if db_rows:
             df_display = pd.DataFrame(db_rows)
             
-            # --- 🚀 ለመደርደሪያው (Sorting) የተሰራ ሎጂክ ---
             if sort_by == "በጊዜ ዝርዝር (ከአዲስ ወደ አሮጌ)":
                 df_display['ቀን'] = pd.to_datetime(df_display['ቀን'])
                 df_display = df_display.sort_values(by='ቀን', ascending=False)
@@ -346,7 +349,6 @@ with menu[1]:
                 df_display = df_display.sort_values(by='ቀን', ascending=True)
                 
             elif sort_by == "በያዘው የዕጣ ቁጥር (ከትንሽ ወደ ትልቅ)":
-                # ከዕጣ ቁጥሮቹ ውስጥ የመጀመሪያውን ትንሹን ቁጥር ወስዶ ለመደርደር
                 def get_first_ticket_num(ticket_str):
                     try:
                         nums = [int(x.strip()) for x in str(ticket_str).split(",") if x.strip()]
@@ -358,12 +360,8 @@ with menu[1]:
                 df_display = df_display.sort_values(by='temp_sort_key', ascending=True)
                 df_display = df_display.drop(columns=['temp_sort_key'])
             
-            # ሰንጠረዡን በዌብሳይቱ ላይ ማሳያ
             st.dataframe(df_display, use_container_width=True)
             
-            # --------------------------------------------------
-            # 🚀 የ Excel ማዘጋጃ (በአዲሱ ዙር መሠረት)
-            # --------------------------------------------------
             tickets_data = []
             for i in range(1, 2501):
                 tickets_data.append({
@@ -386,13 +384,8 @@ with menu[1]:
                             if 1 <= ticket_num <= 2500:
                                 idx = ticket_num - 1
                                 tickets_data[idx]["የባለዕድሉ ስም"] = row["ስም"]
-                                
                                 phone_str = str(row["ስልክ"]).strip()
-                                if phone_str.isdigit():
-                                    tickets_data[idx]["ስልክ ቁጥር"] = int(phone_str)
-                                else:
-                                    tickets_data[idx]["ስልክ ቁጥር"] = phone_str
-                                
+                                tickets_data[idx]["ስልክ ቁጥር"] = phone_str
                                 tickets_data[idx]["የተከፈለው ብር"] = float(row["ብር"])
                                 tickets_data[idx]["የላኪ ስም"] = row["ላኪ"] if row["ላኪ"] else ""
                                 tickets_data[idx]["የተቀባይ ስም"] = row["ተቀባይ"] if row["ተቀባይ"] else ""
@@ -402,14 +395,14 @@ with menu[1]:
                             pass
             
             df_final = pd.DataFrame(tickets_data)
-            csv_data = df_final.to_csv(index=False, header=False, encoding='utf-8-sig')
+            csv_data = df_final.to_csv(index=False, header=True, encoding='utf-8-sig')
             
             st.markdown("---")
             st.subheader("📥 የዕጣዎችን ዝርዝር በExcel አውርድ")
             st.download_button(
-                label="📊 የ2ኛ ዙር ሙሉ የዕጣዎች ዝርዝር Excel አውርድ",
+                label="📊 ሙሉ የዕጣዎች ዝርዝር Excel አውርድ",
                 data=csv_data,
-                file_name="round_2_lottery_tickets.csv",
+                file_name="lottery_tickets.csv",
                 mime="text/csv",
                 use_container_width=True
             )
@@ -427,11 +420,9 @@ with menu[2]:
     st.info("""
     💡 **ይህ ተግባር የሚከተሉትን ያከናውናል፦**
     1. ከ 1 እስከ 2500 ያሉትን የዕጣ ቁጥሮች በሙሉ ነጻ ያደርጋል (ስም እና ስልክ እንደ አዲስ እንዲመዘገብ ያደርጋል)።
-    2. **ነገር ግን በመጀመሪያው ዙር ጥቅም ላይ የዋሉትን Screenshots (Transaction IDs) በዳታቤዙ ውስጥ ያስቀምጣል።** 
-    3. በዚህም ምክንያት በመጀመሪያው ዙር ያሸነፉበትን ወይም የተጠቀሙበትን ደረሰኝ በ2ኛው ዙር ላይ ደግመው ለመጠቀም ቢሞክሩ ሲስተሙ አይቀበላቸውም።
+    2. የድሮ ደረሰኞች በድጋሚ እንዳይመዘገቡ ይቆለፋሉ።
     """)
     
-    # ድንገት በስህተት እንዳይነካ ተጨማሪ ማረጋገጫ
     confirm_reset = st.checkbox("አዎ፣ የዕጣ ቁጥሮቹን ብቻ ነጻ አድርጌ አዲስ ዙር ለመጀመር እስማማለሁ።")
     
     if confirm_reset:
@@ -442,18 +433,15 @@ with menu[2]:
                 try:
                     conn = get_db_connection()
                     cursor = conn.cursor()
-                    
-                    # የዕጣ ቁጥሮቹን ብቻ ባዶ ማድረግ (በዚህም ምክንያት የድሮ ባለዕድሎች መረጃ ለጊዜው ይደበቃል፤ አዲስ ዙር ይጀምራል)
                     cursor.execute("UPDATE customer_tickets SET ticket_numbers = ''")
                     conn.commit()
                     cursor.close()
                     conn.close()
                     
                     st.balloons()
-                    st.success("🎉 የዕጣ ቁጥሮች በሙሉ በተሳካ ሁኔታ ነጻ ተደርገዋል! 2ኛው ዙር አሁን በይፋ ተጀምሯል። አሮጌ ደረሰኞች ግን እንዳይደገሙ ተቆልፈው ቀርተዋል።")
+                    st.success("🎉 የዕጣ ቁጥሮች በሙሉ በተሳካ ሁኔታ ነጻ ተደርገዋል! 2ኛው ዙር አሁን በይፋ ተጀምሯል።")
                     st.rerun()
                 except Exception as e:
                     st.error(f"ስህተት አጋጥሟል፦ {e}")
             else:
                 st.error("❌ የተሳሳተ የይለፍ ቃል! ዳግም ማስጀመር አልተቻለም።")
-
