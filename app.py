@@ -46,7 +46,7 @@ init_db()
 def check_password():
     """የይለፍ ቃል ትክክል ከሆነ True ይመልሳል፣ ካልሆነ ግን የመግቢያ ፎርም ያሳያል"""
     def password_entered():
-        if st.session_state["password"] == "125536": # <--- የይለፍ ቃል እዚህ ተቀምጧል
+        if st.session_state["password"] == "125536": # <--- የይለፍ ቃልሽ እዚህ ተቀምጧል
             st.session_state["password_correct"] = True
             del st.session_state["password"]  # የይለፍ ቃሉን ከሴሽን ለማጥፋት
         else:
@@ -104,7 +104,6 @@ def parse_qr_data(qr_text):
 def get_allocated_tickets():
     conn = get_db_connection()
     cursor = conn.cursor()
-    # የዕጣ ቁጥራቸው ባዶ ያልሆኑትን ብቻ ነው የተያዙት ብለን የምንወስደው
     cursor.execute("SELECT ticket_numbers FROM customer_tickets WHERE ticket_numbers != '' AND ticket_numbers IS NOT NULL")
     rows = cursor.fetchall()
     cursor.close()
@@ -174,10 +173,10 @@ with menu[0]:
             # ደረሰኝ በ 1ኛው ዙር ጥቅም ላይ ውሎ ከነበረ እዚህ ጋር ይይዘዋል!
             if existing_record:
                 st.error(f"""
-                🚨 **ይህ ደረሰኝ በመጀመሪያው ዙር (ወይም ቀደም ሲል) ጥቅም ላይ ውሏል!**
+                🚨 **ይህ ደረሰኝ በቀደመው ዙር ጥቅም ላይ ውሏል!**
                 * በመሆኑም ይህንን ደረሰኝ ለሁለተኛ ዙር መጠቀም አይቻልም።
                 
-                * **የመጀመሪያ ዙር የተመዘገበበት ስም፦** {existing_record['customer_name']} 
+                * **የቀደመው ዙር የተመዘገበበት ስም፦** {existing_record['customer_name']} 
                 * **ስልክ ቁጥር፦** {existing_record['customer_phone']}
                 """)
                 st.stop()
@@ -192,8 +191,8 @@ with menu[0]:
             
             st.markdown("---")
             st.subheader("👤 የባለዕድሉ መረጃ")
-            c_name = st.text_input("የባለዕድሉ ሙሉ ስም")
-            c_phone = st.text_input("የባለዕድሉ ስልክ ቁጥር")
+            c_name = st.text_input("የባለዕድሉ ሙሉ ስም (ግዴታ ነው)")
+            c_phone = st.text_input("የባለዕድሉ ስልክ ቁጥር (ግዴታ ነው - ቢያንስ 10 አሃዝ)")
             
             st.markdown("---")
             st.subheader("🎫 የዕጣ አሰጣጥ ዘዴ")
@@ -233,8 +232,16 @@ with menu[0]:
             
             st.markdown("---")
             if st.button("አረጋግጥ እና መዝግብ (Accept & Save)"):
-                if not c_name or not c_phone:
-                    st.error("❌ እባክዎ የስም እና ስልክ መረጃዎችን ይሙሉ!")
+                # ስልክ ቁጥሩን ቼክ ማድረጊያ Regex (ከተፈለገ በ '+' ሊጀምር ይችላል፣ በመቀጠል ቢያንስ 10 አሃዞች መኖር አለበት)
+                phone_pattern = r'^\+?[0-9]{10,}$'
+                clean_phone = c_phone.replace(" ", "").strip()
+                
+                if not c_name.strip():
+                    st.error("❌ እባክዎ የባለዕድሉን ሙሉ ስም ያስገቡ!")
+                elif not clean_phone:
+                    st.error("❌ እባክዎ የባለዕድሉን ስልክ ቁጥር ያስገቡ!")
+                elif not re.match(phone_pattern, clean_phone):
+                    st.error("❌ ስህተት፦ የስልክ ቁጥሩ ቢያንስ 10 አሃዞች (ቁጥሮች) መሆን አለበት! (ምሳሌ፦ 0912345678 ወይም +251912345678)")
                 elif edit_amount <= 0:
                     st.error("❌ እባክዎ የተላከውን የብር መጠን ያስገቡ!")
                 elif not final_tickets:
@@ -248,7 +255,7 @@ with menu[0]:
                         cursor.execute("""
                             INSERT INTO customer_tickets (transaction_id, sender_name, receiver_name, amount, customer_name, customer_phone, ticket_numbers)
                             VALUES (%s, %s, %s, %s, %s, %s, %s)
-                        """, (edit_tx_id, edit_sender, edit_receiver, edit_amount, c_name, c_phone, tickets_str))
+                        """, (edit_tx_id, edit_sender, edit_receiver, edit_amount, c_name.strip(), clean_phone, tickets_str))
                         
                         conn.commit()
                         cursor.close()
@@ -267,13 +274,25 @@ with menu[0]:
 # 6. የተመዘገቡ ባለዕድሎች ዝርዝር እና የኤክሰል ማውረጃ
 # ==========================================
 with menu[1]:
-    st.subheader("📋 በ2ኛው ዙር የተመዘገቡ ባለዕድሎች ዝርዝር")
+    st.subheader("📋 የተመዘገቡ ባለዕድሎች ዝርዝር")
+    
+    # የፍለጋ ሳጥን
     search_query = st.text_input("በስም፣ በስልክ ቁጥር ወይም በዕጣ ቁጥር ይፈልጉ...")
+    
+    # 🔄 አዲሱ የመደርደሪያ ምርጫ (Sort Options)
+    sort_by = st.selectbox(
+        "📋 መረጃዎችን መደርደሪያ (Sort By)፦",
+        [
+            "በጊዜ ዝርዝር (ከአዲስ ወደ አሮጌ)", 
+            "በጊዜ ዝርዝር (ከአሮጌ ወደ አዲስ)", 
+            "በያዘው የዕጣ ቁጥር (ከትንሽ ወደ ትልቅ)"
+        ]
+    )
     
     db_rows = []
     try:
         conn = get_db_connection()
-        # ለ2ኛው ዙር የሚታዩት የዕጣ ቁጥር ያላቸው (ያልተሰረዙት) ብቻ ናቸው
+        # ለወቅታዊው ዙር የሚታዩት የዕጣ ቁጥር ያላቸው (ያልተሰረዙት) ብቻ ናቸው
         if search_query:
             query = """
                 SELECT customer_name as ስም, customer_phone as ስልክ, ticket_numbers as "የዕጣ ቁጥሮች", amount as ብር, sender_name as ላኪ, receiver_name as ተቀባይ, transaction_id as "Ref ID", created_at as ቀን 
@@ -286,7 +305,6 @@ with menu[1]:
                    OR ticket_numbers LIKE %s
                    OR ticket_numbers = %s
                 )
-                ORDER BY id DESC
             """
             exact_match = search_query.strip()
             param_like_start = f"%,{exact_match}"
@@ -310,7 +328,6 @@ with menu[1]:
                 SELECT customer_name as ስም, customer_phone as ስልክ, ticket_numbers as "የዕጣ ቁጥሮች", amount as ብር, sender_name as ላኪ, receiver_name as ተቀባይ, transaction_id as "Ref ID", created_at as ቀን 
                 FROM customer_tickets 
                 WHERE ticket_numbers != '' AND ticket_numbers IS NOT NULL
-                ORDER BY id DESC
             """)
             db_rows = cursor.fetchall()
             cursor.close()
@@ -318,6 +335,30 @@ with menu[1]:
         
         if db_rows:
             df_display = pd.DataFrame(db_rows)
+            
+            # --- 🚀 ለመደርደሪያው (Sorting) የተሰራ ሎጂክ ---
+            if sort_by == "በጊዜ ዝርዝር (ከአዲስ ወደ አሮጌ)":
+                df_display['ቀን'] = pd.to_datetime(df_display['ቀን'])
+                df_display = df_display.sort_values(by='ቀን', ascending=False)
+                
+            elif sort_by == "በጊዜ ዝርዝር (ከአሮጌ ወደ አዲስ)":
+                df_display['ቀን'] = pd.to_datetime(df_display['ቀን'])
+                df_display = df_display.sort_values(by='ቀን', ascending=True)
+                
+            elif sort_by == "በያዘው የዕጣ ቁጥር (ከትንሽ ወደ ትልቅ)":
+                # ከዕጣ ቁጥሮቹ ውስጥ የመጀመሪያውን ትንሹን ቁጥር ወስዶ ለመደርደር
+                def get_first_ticket_num(ticket_str):
+                    try:
+                        nums = [int(x.strip()) for x in str(ticket_str).split(",") if x.strip()]
+                        return min(nums) if nums else 99999
+                    except:
+                        return 99999
+                
+                df_display['temp_sort_key'] = df_display['የዕጣ ቁጥሮች'].apply(get_first_ticket_num)
+                df_display = df_display.sort_values(by='temp_sort_key', ascending=True)
+                df_display = df_display.drop(columns=['temp_sort_key'])
+            
+            # ሰንጠረዡን በዌብሳይቱ ላይ ማሳያ
             st.dataframe(df_display, use_container_width=True)
             
             # --------------------------------------------------
@@ -402,7 +443,7 @@ with menu[2]:
                     conn = get_db_connection()
                     cursor = conn.cursor()
                     
-                    # የዕጣ ቁጥሮቹን ብቻ ባዶ ማድረግ (እንዲሁም ስም/ስልክ መረጃዎቻቸው ለዚህ ዙር እንዳይታዩ ያደርጋል)
+                    # የዕጣ ቁጥሮቹን ብቻ ባዶ ማድረግ (በዚህም ምክንያት የድሮ ባለዕድሎች መረጃ ለጊዜው ይደበቃል፤ አዲስ ዙር ይጀምራል)
                     cursor.execute("UPDATE customer_tickets SET ticket_numbers = ''")
                     conn.commit()
                     cursor.close()
